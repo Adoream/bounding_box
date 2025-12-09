@@ -4,11 +4,12 @@ import os
 import numpy as np
 import json
 import traceback
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 from data_io import build_volumes_from_folder, VolumeWrapper
 from widgets import ImageLabel
 from annotations import AnnotationStore
+
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -45,21 +46,24 @@ class MainWindow(QtWidgets.QMainWindow):
 
         left_panel.addStretch(1)
 
-
         # 中间：图像显示
         center_panel = QtWidgets.QVBoxLayout()
         self.image_label = ImageLabel()
         self.image_label.setStyleSheet("background-color: black;")
         self.image_label.pointAdded.connect(self.on_point_added)
         self.image_label.bboxFinished.connect(self.on_bbox_finished)
-        self.image_label.wheelScrolled.connect(self.on_wheel_scrolled)  # 新增：滚轮 -> 切 slice
-        center_panel.addWidget(self.image_label, alignment=QtCore.Qt.AlignCenter)
+        # 滚轮 -> 切 slice
+        self.image_label.wheelScrolled.connect(self.on_wheel_scrolled)
+        center_panel.addWidget(
+            self.image_label,
+            alignment=QtCore.Qt.AlignmentFlag.AlignCenter,
+        )
 
         center_panel.addSpacing(10)
 
         # slice 控件
         slice_layout = QtWidgets.QHBoxLayout()
-        self.slice_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.slice_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
         self.slice_slider.setMinimum(0)
         self.slice_slider.setMaximum(0)
         self.slice_slider.setValue(0)
@@ -163,15 +167,22 @@ class MainWindow(QtWidgets.QMainWindow):
         img_norm = self.apply_window(img2d, volume)
 
         # 构造灰度 QImage
-        qimage = QtGui.QImage(img_norm.data, w, h, w,
-                              QtGui.QImage.Format_Grayscale8)
-        pixmap = QtGui.QPixmap.fromImage(qimage.copy())  # copy 防止引用问题
+        qimage = QtGui.QImage(
+            img_norm.data,
+            w,
+            h,
+            w,
+            QtGui.QImage.Format.Format_Grayscale8,
+        )
+        # copy 防止引用问题
+        pixmap = QtGui.QPixmap.fromImage(qimage.copy())
 
         # 在当前 slice 上叠加标注
         painter = QtGui.QPainter(pixmap)
-        pen_point = QtGui.QPen(QtCore.Qt.red)
+
+        pen_point = QtGui.QPen(QtGui.QColor("red"))
         pen_point.setWidth(4)
-        pen_box = QtGui.QPen(QtCore.Qt.green)
+        pen_box = QtGui.QPen(QtGui.QColor("green"))
         pen_box.setWidth(2)
 
         # 当前 slice 的点和框（通过 AnnotationStore 过滤）
@@ -179,7 +190,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.current_volume_index,
             self.current_slice_index,
         )
-        
+
         for p in pts:
             painter.setPen(pen_point)
             x = p.x
@@ -189,7 +200,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         for b in bboxes:
             painter.setPen(pen_box)
-            rect = QtCore.QRectF(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1,)
+            rect = QtCore.QRectF(
+                b.x1,
+                b.y1,
+                b.x2 - b.x1,
+                b.y2 - b.y1,
+            )
             painter.drawRect(rect)
 
         painter.end()
@@ -226,10 +242,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         btn_close = QtWidgets.QPushButton("关闭", dialog)
         btn_close.clicked.connect(dialog.accept)
-        layout.addWidget(btn_close, alignment=QtCore.Qt.AlignRight)
+        layout.addWidget(
+            btn_close,
+            alignment=QtCore.Qt.AlignmentFlag.AlignRight,
+        )
 
-        dialog.exec_()
-
+        dialog.exec()
 
     # ---------- 事件处理：序列 / slice / WL/WW ----------
 
@@ -253,9 +271,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.slice_slider.blockSignals(False)
 
         # 显示 meta 信息
-        info_lines = [f"名称: {volume.name}",
-                      f"形状: Z={z}, H={h}, W={w}",
-                      f"来源: {volume.source_type}"]
+        info_lines = [
+            f"名称: {volume.name}",
+            f"形状: Z={z}, H={h}, W={w}",
+            f"来源: {volume.source_type}",
+        ]
         for k, v in volume.meta.items():
             info_lines.append(f"{k}: {v}")
         self.info_text.setPlainText("\n".join(info_lines))
@@ -303,13 +323,12 @@ class MainWindow(QtWidgets.QMainWindow):
         volume = self.volumes[self.current_volume_index]
         z = volume.volume.shape[0]
 
-        # 这里使用 -steps，是因为 angleDelta().y() > 0 表示向上滚
+        # angleDelta().y() > 0 表示向上滚，这里用 -steps
         new_slice = self.current_slice_index - steps
         new_slice = max(0, min(z - 1, new_slice))
 
         # 统一通过 slider 来驱动更新逻辑
         self.slice_slider.setValue(new_slice)
-
 
     def on_mode_changed(self):
         if self.radio_point.isChecked():
@@ -327,7 +346,13 @@ class MainWindow(QtWidgets.QMainWindow):
             x,
             y,
         )
-        print("记录点：", self.current_volume_index, self.current_slice_index, x, y)
+        print(
+            "记录点：",
+            self.current_volume_index,
+            self.current_slice_index,
+            x,
+            y,
+        )
         self.update_image_display()
 
     def on_bbox_finished(self, x1: float, y1: float, x2: float, y2: float):
@@ -347,9 +372,16 @@ class MainWindow(QtWidgets.QMainWindow):
             xmax,
             ymax,
         )
-        print("记录 bounding box：", self.current_volume_index, self.current_slice_index, xmin, ymin, xmax, ymax)
+        print(
+            "记录 bounding box：",
+            self.current_volume_index,
+            self.current_slice_index,
+            xmin,
+            ymin,
+            xmax,
+            ymax,
+        )
         self.update_image_display()
-
 
     def on_clear_current_slice(self):
         """
@@ -366,7 +398,6 @@ class MainWindow(QtWidgets.QMainWindow):
         print(f"已清除 volume={v_idx}, slice={s_idx} 上的所有标记")
         self.update_image_display()
 
-
     def on_clear_all_annotations(self):
         """
         清除所有 volume 的所有点和 bbox 标记
@@ -379,15 +410,15 @@ class MainWindow(QtWidgets.QMainWindow):
             self,
             "确认",
             "确定要清除所有标记吗？该操作无法撤销。",
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No
+            QtWidgets.QMessageBox.StandardButton.Yes
+            | QtWidgets.QMessageBox.StandardButton.No,
         )
-        if reply != QtWidgets.QMessageBox.Yes:
+        if reply != QtWidgets.QMessageBox.StandardButton.Yes:
             return
 
         self.annotations.clear_all()
         print("已清除所有标记")
         self.update_image_display()
-
 
     def on_open_folder(self):
         folder = QtWidgets.QFileDialog.getExistingDirectory(
@@ -396,7 +427,9 @@ class MainWindow(QtWidgets.QMainWindow):
         if not folder:
             return
 
-        QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        QtWidgets.QApplication.setOverrideCursor(
+            QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor)
+        )
         try:
             try:
                 # 这里如果内部抛异常，会被下面的大 except 接住
@@ -434,7 +467,10 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         path, _ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "保存标注为 JSON", "annotations.json", "JSON files (*.json)"
+            self,
+            "保存标注为 JSON",
+            "annotations.json",
+            "JSON files (*.json)",
         )
         if not path:
             return
@@ -456,19 +492,26 @@ class MainWindow(QtWidgets.QMainWindow):
 
             # NIfTI：整卷对应一个文件
             if v.source_type == "nifti":
-                fp = getattr(v, "file_path", None) or v.meta.get("file_path", "")
+                fp = getattr(v, "file_path", None) or v.meta.get(
+                    "file_path", ""
+                )
                 fn = os.path.basename(fp) if fp else ""
                 return fp, fn
 
             # DICOM：一个 slice 对应一个 DICOM 文件
             if v.source_type == "dicom":
-                if getattr(v, "slice_paths", None) and 0 <= slice_idx < len(v.slice_paths):
+                if getattr(v, "slice_paths", None) and 0 <= slice_idx < len(
+                    v.slice_paths
+                ):
                     fp = v.slice_paths[slice_idx]
                     fn = os.path.basename(fp)
                     return fp, fn
                 # 找不到对应 slice 时，退而求其次给 series 目录
                 series_folder = v.meta.get("SeriesFolder", "")
-                return series_folder, os.path.basename(series_folder) if series_folder else ""
+                return (
+                    series_folder,
+                    os.path.basename(series_folder) if series_folder else "",
+                )
 
             # 其它类型默认空
             return "", ""
@@ -482,6 +525,8 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
-            QtWidgets.QMessageBox.information(self, "成功", f"标注已保存到：\n{path}")
+            QtWidgets.QMessageBox.information(
+                self, "成功", f"标注已保存到：\n{path}"
+            )
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "错误", f"保存失败：\n{e}")
