@@ -37,28 +37,10 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # Since we are not using Nuitka-Action, install Nuitka explicitly
           pip install nuitka
 
-      # Provide bash on Windows runners in a consistent way
-      - name: Setup MSYS2 (Windows)
-        if: runner.os == 'Windows'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          update: true
-
-      - name: Build (macOS)
-        if: runner.os == 'macOS'
+      - name: Build
         shell: bash
-        run: |
-          set -euo pipefail
-          chmod +x scripts/build.sh
-          scripts/build.sh app.py ct-annotator-${{ matrix.artifact_suffix }}
-
-      - name: Build (Windows)
-        if: runner.os == 'Windows'
-        shell: msys2 {0}
         run: |
           set -euo pipefail
           chmod +x scripts/build.sh
