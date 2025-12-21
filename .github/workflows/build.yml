@@ -2,8 +2,7 @@ name: Build
 
 on:
   push:
-    branches:
-      - master
+    branches: [ master ]
     paths-ignore:
       - 'README.md'
   workflow_dispatch:
@@ -12,7 +11,11 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        include:
+          - os: macos-latest
+            artifact_suffix: macos
+          - os: windows-latest
+            artifact_suffix: windows
 
     runs-on: ${{ matrix.os }}
 
@@ -29,17 +32,37 @@ jobs:
             **/requirements*.txt
 
       - name: Install Dependencies
+        shell: bash
         run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
+          # Since we are not using Nuitka-Action, install Nuitka explicitly
+          pip install nuitka
 
-      - name: Build Executable
-        uses: Nuitka/Nuitka-Action@main
+      # Provide bash on Windows runners in a consistent way
+      - name: Setup MSYS2 (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
         with:
-          nuitka-version: main
-          script-name: app.py
-          mode: standalone
-          plugin-enable: pyside6
-          output-file: ct-annotator-${{ matrix.artifact-suffix }}
+          msystem: MINGW64
+          update: true
+
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/build.sh
+          scripts/build.sh app.py ct-annotator-${{ matrix.artifact_suffix }}
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/build.sh
+          scripts/build.sh app.py ct-annotator-${{ matrix.artifact_suffix }}
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
