@@ -64,8 +64,8 @@ echo "==> pydicom data dir: ${PYDICOM_DATA_DIR}"
 # Build arguments as an array (robust quoting)
 NUITKA_ARGS=(
   "${ENTRY_FILE}"
+  "--mode=app"
   --standalone
-  --onefile
   "--output-dir=${BUILD_DIR}"
   "--output-filename=${APP_NAME}"
 
