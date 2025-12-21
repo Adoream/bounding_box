@@ -21,11 +21,12 @@ echo "==> App name: ${APP_NAME}"
 echo "==> Build dir: ${BUILD_DIR}"
 
 # Platform-specific options
+declare -a NUITKA_PLATFORM_OPTS
 NUITKA_PLATFORM_OPTS=()
+
 UNAME_S="$(uname -s 2>/dev/null || echo "")"
 case "${UNAME_S}" in
   MINGW*|MSYS*|CYGWIN*|Windows_NT)
-    # Avoid opening a console window for GUI apps on Windows
     NUITKA_PLATFORM_OPTS+=(--windows-console-mode=disable)
     ;;
   *)
@@ -88,8 +89,10 @@ NUITKA_ARGS=(
   "--include-data-dir=${PYDICOM_DATA_DIR}=pydicom/data"
 )
 
-# Append platform opts
-NUITKA_ARGS+=("${NUITKA_PLATFORM_OPTS[@]}")
+# Append platform opts (avoid nounset/unbound on some shells)
+if ((${#NUITKA_PLATFORM_OPTS[@]} > 0)); then
+  NUITKA_ARGS+=("${NUITKA_PLATFORM_OPTS[@]}")
+fi
 
 # Append extra opts (space-delimited)
 # shellcheck disable=SC2206
