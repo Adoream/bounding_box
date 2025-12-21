@@ -41,7 +41,8 @@ jobs:
 
       - name: Build
         shell: bash
-        NUITKA_EXTRA_OPTS: --assume-yes-for-downloads
+        env:
+          NUITKA_EXTRA_OPTS: --assume-yes-for-downloads
         run: |
           set -euo pipefail
           chmod +x scripts/build.sh
